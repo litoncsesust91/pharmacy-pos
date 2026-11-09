@@ -1,0 +1,27 @@
+{
+  "name": "pharmacy-pos",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @pharmacy-pos/api\" \"npm run dev --workspace @pharmacy-pos/web\"",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "db:generate": "npm run db:generate --workspace @pharmacy-pos/api",
+    "db:migrate": "npm run db:migrate --workspace @pharmacy-pos/api",
+    "db:seed": "npm run db:seed --workspace @pharmacy-pos/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
