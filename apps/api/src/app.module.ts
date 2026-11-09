@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { TenantsModule } from './tenants/tenants.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { CatalogModule } from './catalog/catalog.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SettingsModule } from './settings/settings.module.js';
     AuthModule,
     TenantsModule,
     SettingsModule,
+    CatalogModule,
   ],
   providers: [AppConfig],
 })

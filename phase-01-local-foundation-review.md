@@ -259,6 +259,15 @@ Verify:
 - The page has readable contrast.
 - The page contains no browser console errors.
 
+
+## Backend/API Test
+Start the API:
+
+```bash
+npm run dev --workspace @pharmacy-pos/api
+```
+
+
 ## QA Interview
 
 ### QA: Why is the project split into frontend and backend workspaces?

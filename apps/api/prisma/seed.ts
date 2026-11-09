@@ -100,6 +100,69 @@ async function main(): Promise<void> {
     })),
   });
 
+  const company = await prisma.company.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Demo Pharma Ltd.' } },
+    update: { isActive: true },
+    create: { tenantId: tenant.id, name: 'Demo Pharma Ltd.' },
+  });
+  const group = await prisma.productGroup.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Analgesic' } },
+    update: { isActive: true },
+    create: { tenantId: tenant.id, name: 'Analgesic' },
+  });
+  const supplier = await prisma.supplier.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Demo Medical Supply' } },
+    update: { isActive: true },
+    create: { tenantId: tenant.id, name: 'Demo Medical Supply' },
+  });
+  const product = await prisma.product.upsert({
+    where: { tenantId_sku: { tenantId: tenant.id, sku: 'PARA-500-TAB' } },
+    update: {
+      companyId: company.id,
+      groupId: group.id,
+      name: 'Paracetamol 500 mg Tablet',
+      genericName: 'Paracetamol',
+      dosageForm: 'Tablet',
+      strength: '500 mg',
+      packSize: 10,
+      unit: 'tablet',
+      taxCategory: 'standard',
+      purchasePrice: 1.5,
+      sellingPrice: 2,
+      minimumStock: 20,
+      reorderQuantity: 100,
+      prescriptionRequired: false,
+      controlledDrug: false,
+      isActive: true,
+    },
+    create: {
+      tenantId: tenant.id,
+      companyId: company.id,
+      groupId: group.id,
+      name: 'Paracetamol 500 mg Tablet',
+      genericName: 'Paracetamol',
+      dosageForm: 'Tablet',
+      strength: '500 mg',
+      packSize: 10,
+      unit: 'tablet',
+      sku: 'PARA-500-TAB',
+      taxCategory: 'standard',
+      purchasePrice: 1.5,
+      sellingPrice: 2,
+      minimumStock: 20,
+      reorderQuantity: 100,
+    },
+  });
+  await prisma.productBarcode.deleteMany({ where: { productId: product.id } });
+  await prisma.productBarcode.create({
+    data: { tenantId: tenant.id, productId: product.id, code: '8901234567890', isPrimary: true },
+  });
+  await prisma.productSupplier.upsert({
+    where: { productId_supplierId: { productId: product.id, supplierId: supplier.id } },
+    update: { preferred: true },
+    create: { productId: product.id, supplierId: supplier.id, preferred: true },
+  });
+
   const permissionDefinitions = [
     ['tenant.read', 'View the current tenant'],
     ['branch.read', 'View assigned branches'],
@@ -108,6 +171,8 @@ async function main(): Promise<void> {
     ['user.manage', 'Manage users'],
     ['settings.read', 'View tenant settings'],
     ['settings.manage', 'Manage tenant settings'],
+    ['catalog.read', 'View catalog records'],
+    ['catalog.manage', 'Manage catalog records'],
   ] as const;
 
   const permissions = await Promise.all(

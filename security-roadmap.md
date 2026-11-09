@@ -98,6 +98,8 @@ Security is a required deliverable in every development phase. A phase is not co
 
 ## Phase 04: Product Catalog
 
+### Implemented In Phase 4
+
 ### Security Features
 
 - Role-controlled product and price changes.

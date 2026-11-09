@@ -42,3 +42,5 @@ npm run lint
 npm test
 npm run build
 ```
+
+npm run dev --workspace @pharmacy-pos/api

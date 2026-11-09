@@ -27,6 +27,11 @@ model Tenant {
   roles       Role[]
   auditLogs   AuditLog[]
   settings    TenantSettings?
+  companies   Company[]
+  productGroups ProductGroup[]
+  suppliers   Supplier[]
+  products    Product[]
+  barcodes    ProductBarcode[]
 }
 
 model CountryProfile {
@@ -85,6 +90,109 @@ model TenantPaymentMethod {
 
   @@unique([settingsId, code])
   @@index([settingsId, enabled])
+}
+
+model Company {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model ProductGroup {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model Supplier {
+  id        String            @id @default(cuid())
+  tenantId  String
+  name      String
+  phone     String?
+  email     String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products  ProductSupplier[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model Product {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  companyId           String?
+  groupId             String?
+  name                String
+  genericName         String?
+  dosageForm          String?
+  strength            String?
+  packSize            Decimal?          @db.Decimal(10, 3)
+  unit                String?
+  sku                 String
+  taxCategory         String?
+  purchasePrice       Decimal           @db.Decimal(12, 2)
+  sellingPrice        Decimal           @db.Decimal(12, 2)
+  minimumStock        Int               @default(0)
+  reorderQuantity     Int               @default(0)
+  prescriptionRequired Boolean          @default(false)
+  controlledDrug      Boolean           @default(false)
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company             Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  group               ProductGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  barcodes            ProductBarcode[]
+  suppliers           ProductSupplier[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, name])
+  @@index([tenantId, genericName])
+  @@index([companyId])
+  @@index([groupId])
+}
+
+model ProductBarcode {
+  id        String   @id @default(cuid())
+  tenantId  String
+  productId String
+  code      String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([productId])
+}
+
+model ProductSupplier {
+  productId  String
+  supplierId String
+  preferred  Boolean  @default(false)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@id([productId, supplierId])
 }
 
 model Branch {
