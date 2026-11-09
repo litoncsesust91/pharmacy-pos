@@ -45,6 +45,8 @@ Security is a required deliverable in every development phase. A phase is not co
 
 ## Phase 02: Tenants, Authentication, and RBAC
 
+### Implemented In Phase 2
+
 ### Security Features
 
 - OIDC/OAuth2 authentication.
@@ -73,6 +75,8 @@ Security is a required deliverable in every development phase. A phase is not co
 - Direct-object-reference manipulation test.
 
 ## Phase 03: Country and Business Configuration
+
+### Implemented In Phase 3
 
 ### Security Features
 

@@ -2,6 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppConfig, appConfig } from './config/app.config.js';
 import { HealthModule } from './health/health.module.js';
+import { PrismaModule } from './prisma/prisma.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { TenantsModule } from './tenants/tenants.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 
 @Module({
   imports: [
@@ -11,6 +16,11 @@ import { HealthModule } from './health/health.module.js';
       load: [appConfig],
     }),
     HealthModule,
+    PrismaModule,
+    AuditModule,
+    AuthModule,
+    TenantsModule,
+    SettingsModule,
   ],
   providers: [AppConfig],
 })

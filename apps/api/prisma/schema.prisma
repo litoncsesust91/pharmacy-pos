@@ -14,3 +14,175 @@ model SystemInfo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Tenant {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  branches    Branch[]
+  users       User[]
+  roles       Role[]
+  auditLogs   AuditLog[]
+  settings    TenantSettings?
+}
+
+model CountryProfile {
+  id                         String          @id @default(cuid())
+  code                       String          @unique
+  name                       String
+  defaultCurrencyCode        String
+  defaultTimezone            String
+  defaultLocale              String
+  defaultTaxName             String
+  defaultTaxRate             Decimal         @db.Decimal(5, 2)
+  defaultExpiryWarningDays  Int
+  defaultBlockExpired        Boolean
+  defaultBlockNearExpiry     Boolean
+  defaultPrescriptionRequired Boolean
+  defaultControlledDrugs     Boolean
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  tenantSettings             TenantSettings[]
+}
+
+model TenantSettings {
+  id                         String          @id @default(cuid())
+  tenantId                   String          @unique
+  countryProfileId           String
+  currencyCode               String
+  timezone                   String
+  locale                     String
+  taxEnabled                 Boolean         @default(true)
+  taxName                   String
+  taxRate                   Decimal         @db.Decimal(5, 2)
+  expiryWarningDays          Int             @default(90)
+  blockExpiredProducts       Boolean         @default(true)
+  blockNearExpiryProducts    Boolean         @default(false)
+  prescriptionRequired       Boolean         @default(true)
+  controlledDrugsEnabled     Boolean         @default(true)
+  offlineHighRiskSalesAllowed Boolean        @default(false)
+  receiptPrefix              String          @default("SALE")
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  tenant                     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  countryProfile             CountryProfile  @relation(fields: [countryProfileId], references: [id])
+  paymentMethods             TenantPaymentMethod[]
+
+  @@index([countryProfileId])
+}
+
+model TenantPaymentMethod {
+  id          String         @id @default(cuid())
+  settingsId  String
+  code        String
+  displayName String
+  enabled     Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  settings    TenantSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, code])
+  @@index([settingsId, enabled])
+}
+
+model Branch {
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userBranches UserBranch[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model User {
+  id           String        @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles    UserRole[]
+  userBranches UserBranch[]
+  auditLogs    AuditLog[]    @relation("AuditActor")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model Role {
+  id           String           @id @default(cuid())
+  tenantId     String
+  name         String
+  key          String
+  createdAt    DateTime         @default(now())
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles    UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+model Permission {
+  id             String           @id @default(cuid())
+  key            String           @unique
+  description    String
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserBranch {
+  userId   String
+  branchId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([userId, branchId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([actorId, createdAt])
+}
