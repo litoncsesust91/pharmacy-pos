@@ -1,6 +1,6 @@
 # Pharmacy POS
 
-The project is currently in Phase 1: local technical foundation.
+The project is currently in Phase 11: reports and exports.
 
 ## Requirements
 
@@ -31,6 +31,8 @@ The web application runs at `http://localhost:5173`.
 The API health endpoint is available at `http://localhost:3000/api/health`.
 
 Swagger documentation is available at `http://localhost:3000/api/docs`.
+
+Reports are available under `/api/reports` for users with `reports.read`. CSV and PDF export links are tenant-scoped and expire after 24 hours.
 
 When the storage profile is enabled, MinIO is available at `http://localhost:9001`.
 

@@ -13,6 +13,8 @@ import { PurchasingModule } from './purchasing/purchasing.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
     SalesModule,
     PaymentsModule,
     PrescriptionsModule,
+    JobsModule,
+    ReportsModule,
   ],
   providers: [AppConfig],
 })

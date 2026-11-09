@@ -16,38 +16,44 @@ model SystemInfo {
 }
 
 model Tenant {
-  id                    String                 @id @default(cuid())
-  name                  String
-  slug                  String                 @unique
-  isActive              Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  branches              Branch[]
-  users                 User[]
-  roles                 Role[]
-  auditLogs             AuditLog[]
-  settings              TenantSettings?
-  companies             Company[]
-  productGroups         ProductGroup[]
-  suppliers             Supplier[]
-  products              Product[]
-  barcodes              ProductBarcode[]
-  batches               InventoryBatch[]
-  stockLedger           StockLedgerEntry[]
-  purchaseOrders        PurchaseOrder[]
-  purchaseReceipts      PurchaseReceipt[]
-  purchaseReturns       PurchaseReturn[]
-  supplierPayables      SupplierPayable[]
-  supplierPayments      SupplierPayment[]
-  customers             Customer[]
-  sales                 Sale[]
-  cashRegisters         CashRegister[]
-  cashSessions          CashSession[]
-  cashMovements         CashMovement[]
-  payments              PaymentTransaction[]
-  refunds               Refund[]
-  prescriptions         Prescription[]
-  prescriptionDocuments PrescriptionDocument[]
+  id                       String                  @id @default(cuid())
+  name                     String
+  slug                     String                  @unique
+  isActive                 Boolean                 @default(true)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  branches                 Branch[]
+  users                    User[]
+  roles                    Role[]
+  auditLogs                AuditLog[]
+  settings                 TenantSettings?
+  companies                Company[]
+  productGroups            ProductGroup[]
+  suppliers                Supplier[]
+  products                 Product[]
+  barcodes                 ProductBarcode[]
+  batches                  InventoryBatch[]
+  stockLedger              StockLedgerEntry[]
+  purchaseOrders           PurchaseOrder[]
+  purchaseReceipts         PurchaseReceipt[]
+  purchaseReturns          PurchaseReturn[]
+  supplierPayables         SupplierPayable[]
+  supplierPayments         SupplierPayment[]
+  customers                Customer[]
+  sales                    Sale[]
+  cashRegisters            CashRegister[]
+  cashSessions             CashSession[]
+  cashMovements            CashMovement[]
+  payments                 PaymentTransaction[]
+  refunds                  Refund[]
+  prescriptions            Prescription[]
+  prescriptionDocuments    PrescriptionDocument[]
+  notifications            Notification[]
+  notificationPreference   NotificationPreference? @relation(fields: [notificationPreferenceId], references: [id])
+  backgroundJobs           BackgroundJob[]
+  reportSchedules          ReportSchedule[]
+  reportExports            ReportExport[]
+  notificationPreferenceId String?
 }
 
 model CountryProfile {
@@ -393,6 +399,96 @@ model SaleLine {
 
   @@index([saleId])
   @@index([productId, createdAt])
+}
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  inApp     Boolean  @default(true)
+  email     Boolean  @default(false)
+  push      Boolean  @default(false)
+  lowStock  Boolean  @default(true)
+  expiry    Boolean  @default(true)
+  summaries Boolean  @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenants   Tenant[]
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  dedupeKey String
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+}
+
+model BackgroundJob {
+  id            String    @id @default(cuid())
+  tenantId      String
+  requestedById String?
+  queueName     String
+  jobType       String
+  status        String    @default("QUEUED")
+  payload       Json
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(3)
+  dedupeKey     String
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  availableAt   DateTime  @default(now())
+  completedAt   DateTime?
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy   User?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status, createdAt])
+}
+
+model ReportSchedule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  createdById String
+  name        String
+  reportType  String
+  cron        String
+  filters     Json?
+  enabled     Boolean   @default(true)
+  nextRunAt   DateTime?
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, enabled, nextRunAt])
+}
+
+model ReportExport {
+  id            String   @id @default(cuid())
+  tenantId      String
+  requestedById String
+  reportType    String
+  format        String
+  status        String   @default("READY")
+  filters       Json
+  tokenHash     String   @unique
+  content       Bytes?
+  expiresAt     DateTime
+  downloadedAt  DateTime?
+  createdAt     DateTime @default(now())
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy   User    @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, expiresAt])
 }
 
 model CashRegister {
@@ -750,35 +846,40 @@ model Branch {
 }
 
 model User {
-  id                            String                 @id @default(cuid())
+  id                            String                  @id @default(cuid())
   tenantId                      String
   email                         String
   passwordHash                  String
   firstName                     String
   lastName                      String
-  isActive                      Boolean                @default(true)
-  createdAt                     DateTime               @default(now())
-  updatedAt                     DateTime               @updatedAt
-  tenant                        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isActive                      Boolean                 @default(true)
+  createdAt                     DateTime                @default(now())
+  updatedAt                     DateTime                @updatedAt
+  tenant                        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles                     UserRole[]
   userBranches                  UserBranch[]
-  auditLogs                     AuditLog[]             @relation("AuditActor")
+  auditLogs                     AuditLog[]              @relation("AuditActor")
   stockLedgerEntries            StockLedgerEntry[]
-  purchaseOrdersCreated         PurchaseOrder[]        @relation("PurchaseOrderRequester")
-  purchaseOrdersApproved        PurchaseOrder[]        @relation("PurchaseOrderApprover")
+  purchaseOrdersCreated         PurchaseOrder[]         @relation("PurchaseOrderRequester")
+  purchaseOrdersApproved        PurchaseOrder[]         @relation("PurchaseOrderApprover")
   purchaseReceiptsReceived      PurchaseReceipt[]
-  purchaseReturnsRequested      PurchaseReturn[]       @relation("PurchaseReturnRequester")
-  purchaseReturnsApproved       PurchaseReturn[]       @relation("PurchaseReturnApprover")
+  purchaseReturnsRequested      PurchaseReturn[]        @relation("PurchaseReturnRequester")
+  purchaseReturnsApproved       PurchaseReturn[]        @relation("PurchaseReturnApprover")
   sales                         Sale[]
-  cashSessionsOpened            CashSession[]          @relation("CashSessionOpener")
-  cashSessionsClosed            CashSession[]          @relation("CashSessionCloser")
+  cashSessionsOpened            CashSession[]           @relation("CashSessionOpener")
+  cashSessionsClosed            CashSession[]           @relation("CashSessionCloser")
   cashMovements                 CashMovement[]
   paymentsInitiated             PaymentTransaction[]
-  refundsRequested              Refund[]               @relation("RefundRequester")
-  refundsApproved               Refund[]               @relation("RefundApprover")
-  prescriptionsCreated          Prescription[]         @relation("PrescriptionCreator")
-  prescriptionsApproved         Prescription[]         @relation("PrescriptionApprover")
+  refundsRequested              Refund[]                @relation("RefundRequester")
+  refundsApproved               Refund[]                @relation("RefundApprover")
+  prescriptionsCreated          Prescription[]          @relation("PrescriptionCreator")
+  prescriptionsApproved         Prescription[]          @relation("PrescriptionApprover")
   prescriptionDocumentsUploaded PrescriptionDocument[]
+  notifications                 Notification[]
+  notificationPreference        NotificationPreference?
+  backgroundJobs                BackgroundJob[]
+  reportSchedules               ReportSchedule[]
+  reportExports                 ReportExport[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
