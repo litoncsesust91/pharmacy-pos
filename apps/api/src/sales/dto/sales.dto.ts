@@ -80,6 +80,10 @@ export class CreateSaleDto {
   customerId?: string;
 
   @IsOptional()
+  @IsString()
+  prescriptionId?: string;
+
+  @IsOptional()
   @IsIn(['cash', 'card', 'bkash', 'nagad', 'rocket'])
   paymentMethod?: string;
 

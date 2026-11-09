@@ -65,6 +65,12 @@ export class SettingsService {
       ...(input.controlledDrugsEnabled !== undefined
         ? { controlledDrugsEnabled: input.controlledDrugsEnabled }
         : {}),
+      ...(input.prescriptionApprovalRequired !== undefined
+        ? { prescriptionApprovalRequired: input.prescriptionApprovalRequired }
+        : {}),
+      ...(input.controlledApprovalRequired !== undefined
+        ? { controlledApprovalRequired: input.controlledApprovalRequired }
+        : {}),
       ...(input.offlineHighRiskSalesAllowed !== undefined
         ? { offlineHighRiskSalesAllowed: input.offlineHighRiskSalesAllowed }
         : {}),

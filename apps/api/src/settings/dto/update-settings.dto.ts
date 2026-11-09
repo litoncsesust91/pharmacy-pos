@@ -93,6 +93,14 @@ export class UpdateSettingsDto {
 
   @IsOptional()
   @IsBoolean()
+  prescriptionApprovalRequired?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  controlledApprovalRequired?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   offlineHighRiskSalesAllowed?: boolean;
 
   @IsOptional()

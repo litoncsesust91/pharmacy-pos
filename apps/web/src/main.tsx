@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fetchProducts, getToken, login, syncSale } from './api';
+import { fetchProducts, getToken, login, paySale, syncSale } from './api';
 import {
   cacheProducts,
   enqueueSale,
@@ -29,6 +29,7 @@ function App(): ReactElement {
   const [branchId, setBranchId] = useState('');
   const [email, setEmail] = useState('owner@demo.local');
   const [password, setPassword] = useState('ChangeMe123!');
+  const [tenantSlug, setTenantSlug] = useState('demo-pharmacy');
   const [loginMessage, setLoginMessage] = useState('Local-first mode');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queued, setQueued] = useState<QueuedSale[]>([]);
@@ -75,7 +76,8 @@ function App(): ReactElement {
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
     try {
-      await login(email, password);
+      const user = await login(email, password, tenantSlug);
+      if (!user.branchIds.includes(branchId) && user.branchIds[0]) setBranchId(user.branchIds[0]);
       const remote = await fetchProducts();
       setProducts(remote);
       await cacheProducts(remote);
@@ -90,7 +92,11 @@ function App(): ReactElement {
     if (!isOnline || !getToken()) return;
     for (const item of queued) {
       try {
-        await syncSale(item.payload);
+        const sale = await syncSale(item.payload) as { id?: string };
+        const paymentAmount = item.payload.clientPaymentAmount;
+        if (sale.id && item.payload.status === 'COMPLETED' && typeof paymentAmount === 'number') {
+          await paySale(sale.id, paymentAmount);
+        }
         await removeQueuedSale(item.id);
       } catch (error) {
         await enqueueSale({ ...item, attempts: item.attempts + 1, lastError: String(error) });
@@ -114,6 +120,7 @@ function App(): ReactElement {
       status,
       paymentMethod: status === 'COMPLETED' ? 'cash' : undefined,
       lines: cart.map((line) => ({ productId: line.id, quantity: line.quantity, discountAmount: line.discountAmount })),
+      clientPaymentAmount: total,
       ...(customerId ? { customerId } : {}),
     };
     if (status === 'SUSPENDED' || !isOnline || !getToken()) {
@@ -122,7 +129,8 @@ function App(): ReactElement {
       setNotice(status === 'SUSPENDED' ? 'Sale suspended locally' : 'Sale queued for synchronization');
     } else {
       try {
-        await syncSale(payload);
+        const sale = await syncSale(payload) as { id?: string };
+        if (sale.id && status === 'COMPLETED') await paySale(sale.id, total);
         setNotice('Sale completed and receipt recorded');
       } catch {
         await enqueueSale({ id: payload.idempotencyKey, payload, createdAt: new Date().toISOString(), attempts: 0 });
@@ -206,6 +214,7 @@ function App(): ReactElement {
           <div><p className="section-label">Secure connection</p><strong>{loginMessage}</strong></div>
           <input value={email} onChange={(event) => setEmail(event.target.value)} aria-label="Email" placeholder="Email" />
           <input value={password} onChange={(event) => setPassword(event.target.value)} aria-label="Password" placeholder="Password" type="password" />
+          <input value={tenantSlug} onChange={(event) => setTenantSlug(event.target.value)} aria-label="Tenant slug" placeholder="Tenant slug" />
           <input value={branchId} onChange={(event) => setBranchId(event.target.value)} aria-label="Branch ID" placeholder="Branch ID" />
           <button className="connect-button">Connect</button>
         </form>

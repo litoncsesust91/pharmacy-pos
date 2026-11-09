@@ -36,12 +36,13 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   return response.json() as Promise<T>;
 }
 
-export async function login(email: string, password: string): Promise<void> {
-  const result = await apiRequest<{ accessToken: string }>('/auth/login', {
+export async function login(email: string, password: string, tenantSlug: string): Promise<{ branchIds: string[] }> {
+  const result = await apiRequest<{ accessToken: string; user: { branchIds: string[] } }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, tenantSlug }),
   });
   setToken(result.accessToken);
+  return result.user;
 }
 
 export async function fetchProducts(): Promise<PosProduct[]> {
@@ -51,4 +52,11 @@ export async function fetchProducts(): Promise<PosProduct[]> {
 
 export async function syncSale(payload: Record<string, unknown>): Promise<unknown> {
   return apiRequest('/sales', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function paySale(saleId: string, amount: number, method = 'cash'): Promise<unknown> {
+  return apiRequest('/payments', {
+    method: 'POST',
+    body: JSON.stringify({ saleId, amount, method, idempotencyKey: `payment-${saleId}` }),
+  });
 }

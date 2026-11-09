@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function main(): Promise<void> {
   await prisma.systemInfo.upsert({
     where: { key: 'schema-version' },
-    update: { value: 'phase-7' },
-    create: { key: 'schema-version', value: 'phase-7' },
+    update: { value: 'phase-9' },
+    create: { key: 'schema-version', value: 'phase-9' },
   });
 
   const bangladesh = await prisma.countryProfile.upsert({
@@ -187,6 +187,18 @@ async function main(): Promise<void> {
     ['sales.read', 'View sales and receipts'],
     ['sales.create', 'Create and complete sales'],
     ['sales.manage', 'Manage customers'],
+    ['payments.read', 'View payment and cash records'],
+    ['payments.create', 'Create and confirm payments'],
+    ['payments.refund', 'Request and complete refunds'],
+    ['payments.approve', 'Approve refunds and cash discrepancies'],
+    ['cash.open', 'Open cash sessions'],
+    ['cash.manage', 'Manage registers and cash movements'],
+    ['cash.close', 'Close cash sessions'],
+    ['cash.approve', 'Approve cash discrepancies'],
+    ['prescription.read', 'View prescription records'],
+    ['prescription.create', 'Create prescription records'],
+    ['prescription.approve', 'Approve prescriptions as pharmacist'],
+    ['prescription.document', 'Access protected prescription documents'],
   ] as const;
 
   const permissions = await Promise.all(

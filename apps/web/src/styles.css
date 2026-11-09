@@ -61,7 +61,7 @@ kbd { background: #e0e3da; border: 1px solid #c4c9be; border-radius: 0.25rem; co
 .secondary-action { background: #e3e8df; color: #506057; }
 .notice { color: #63736a; font-size: 0.72rem; min-height: 1rem; text-align: center; }
 .utility-row { display: grid; gap: 1.3rem; grid-template-columns: 1.45fr 0.8fr; margin-top: 1.3rem; }
-.login-card, .sync-card { align-items: end; display: grid; gap: 0.7rem; grid-template-columns: 1.4fr repeat(3, 1fr) auto; padding: 1rem 1.2rem; }
+.login-card, .sync-card { align-items: end; display: grid; gap: 0.7rem; grid-template-columns: 1.4fr repeat(4, 1fr) auto; padding: 1rem 1.2rem; }
 .login-card input { margin: 0; }
 .login-card strong, .sync-card strong { display: block; font-size: 0.82rem; margin-top: 0.35rem; }
 .connect-button, .sync-card button { background: #27372f; color: #fff; }

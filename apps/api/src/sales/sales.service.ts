@@ -116,6 +116,34 @@ export class SalesService {
     }
 
     const productMap = new Map(products.map((product) => [product.id, product]));
+    const requiresPrescription = products.some((product) => product.prescriptionRequired || product.controlledDrug);
+    if (products.some((product) => product.controlledDrug) && !settings.controlledDrugsEnabled) {
+      throw new ForbiddenException('Controlled products are disabled by tenant policy');
+    }
+    if (requiresPrescription && (settings.prescriptionApprovalRequired || settings.controlledApprovalRequired)) {
+      if (!input.prescriptionId) throw new ForbiddenException('Approved prescription required');
+      const prescription = await this.prisma.prescription.findFirst({
+        where: {
+          id: input.prescriptionId,
+          tenantId: user.tenantId,
+          customerId: input.customerId,
+          status: 'APPROVED',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        include: { lines: true },
+      });
+      if (!prescription) throw new ForbiddenException('Approved prescription not found or expired');
+      for (const line of input.lines) {
+        const product = productMap.get(line.productId)!;
+        if (product.prescriptionRequired || product.controlledDrug) {
+          const authorization = prescription.lines.find(({ productId }) => productId === line.productId);
+          if (!authorization || (authorization.authorizedQuantity !== null && line.quantity > authorization.authorizedQuantity)) {
+            throw new ForbiddenException('Prescription does not authorize this product or quantity');
+          }
+        }
+      }
+    }
+
     const details: SaleDetail[] = input.lines.map((line) => {
       const product = productMap.get(line.productId)!;
       const unitPrice = product.sellingPrice.toNumber();
@@ -158,6 +186,7 @@ export class SalesService {
             taxTotal: totals.taxTotal,
             total: totals.total,
             paymentMethod: input.paymentMethod,
+            prescriptionId: input.prescriptionId,
             clientCreatedAt,
           },
         });
