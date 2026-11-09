@@ -16,67 +16,72 @@ model SystemInfo {
 }
 
 model Tenant {
-  id          String      @id @default(cuid())
-  name        String
-  slug        String      @unique
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  branches    Branch[]
-  users       User[]
-  roles       Role[]
-  auditLogs   AuditLog[]
-  settings    TenantSettings?
-  companies   Company[]
-  productGroups ProductGroup[]
-  suppliers   Supplier[]
-  products    Product[]
-  barcodes    ProductBarcode[]
-  batches     InventoryBatch[]
-  stockLedger StockLedgerEntry[]
+  id               String             @id @default(cuid())
+  name             String
+  slug             String             @unique
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  branches         Branch[]
+  users            User[]
+  roles            Role[]
+  auditLogs        AuditLog[]
+  settings         TenantSettings?
+  companies        Company[]
+  productGroups    ProductGroup[]
+  suppliers        Supplier[]
+  products         Product[]
+  barcodes         ProductBarcode[]
+  batches          InventoryBatch[]
+  stockLedger      StockLedgerEntry[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+  purchaseReturns  PurchaseReturn[]
+  supplierPayables SupplierPayable[]
+  supplierPayments SupplierPayment[]
 }
 
 model CountryProfile {
-  id                         String          @id @default(cuid())
-  code                       String          @unique
-  name                       String
-  defaultCurrencyCode        String
-  defaultTimezone            String
-  defaultLocale              String
-  defaultTaxName             String
-  defaultTaxRate             Decimal         @db.Decimal(5, 2)
-  defaultExpiryWarningDays  Int
-  defaultBlockExpired        Boolean
-  defaultBlockNearExpiry     Boolean
+  id                          String           @id @default(cuid())
+  code                        String           @unique
+  name                        String
+  defaultCurrencyCode         String
+  defaultTimezone             String
+  defaultLocale               String
+  defaultTaxName              String
+  defaultTaxRate              Decimal          @db.Decimal(5, 2)
+  defaultExpiryWarningDays    Int
+  defaultBlockExpired         Boolean
+  defaultBlockNearExpiry      Boolean
   defaultPrescriptionRequired Boolean
-  defaultControlledDrugs     Boolean
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
-  tenantSettings             TenantSettings[]
+  defaultControlledDrugs      Boolean
+  createdAt                   DateTime         @default(now())
+  updatedAt                   DateTime         @updatedAt
+  tenantSettings              TenantSettings[]
 }
 
 model TenantSettings {
-  id                         String          @id @default(cuid())
-  tenantId                   String          @unique
-  countryProfileId           String
-  currencyCode               String
-  timezone                   String
-  locale                     String
-  taxEnabled                 Boolean         @default(true)
-  taxName                   String
-  taxRate                   Decimal         @db.Decimal(5, 2)
-  expiryWarningDays          Int             @default(90)
-  blockExpiredProducts       Boolean         @default(true)
-  blockNearExpiryProducts    Boolean         @default(false)
-  prescriptionRequired       Boolean         @default(true)
-  controlledDrugsEnabled     Boolean         @default(true)
-  offlineHighRiskSalesAllowed Boolean        @default(false)
-  receiptPrefix              String          @default("SALE")
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
-  tenant                     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  countryProfile             CountryProfile  @relation(fields: [countryProfileId], references: [id])
-  paymentMethods             TenantPaymentMethod[]
+  id                          String                @id @default(cuid())
+  tenantId                    String                @unique
+  countryProfileId            String
+  currencyCode                String
+  timezone                    String
+  locale                      String
+  taxEnabled                  Boolean               @default(true)
+  taxName                     String
+  taxRate                     Decimal               @db.Decimal(5, 2)
+  expiryWarningDays           Int                   @default(90)
+  blockExpiredProducts        Boolean               @default(true)
+  blockNearExpiryProducts     Boolean               @default(false)
+  prescriptionRequired        Boolean               @default(true)
+  controlledDrugsEnabled      Boolean               @default(true)
+  offlineHighRiskSalesAllowed Boolean               @default(false)
+  receiptPrefix               String                @default("SALE")
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+  tenant                      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  countryProfile              CountryProfile        @relation(fields: [countryProfileId], references: [id])
+  paymentMethods              TenantPaymentMethod[]
 
   @@index([countryProfileId])
 }
@@ -123,50 +128,60 @@ model ProductGroup {
 }
 
 model Supplier {
-  id        String            @id @default(cuid())
-  tenantId  String
-  name      String
-  phone     String?
-  email     String?
-  isActive  Boolean           @default(true)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products  ProductSupplier[]
+  id               String            @id @default(cuid())
+  tenantId         String
+  name             String
+  phone            String?
+  email            String?
+  paymentTermsDays Int               @default(0)
+  creditLimit      Decimal?          @db.Decimal(12, 2)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products         ProductSupplier[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+  purchaseReturns  PurchaseReturn[]
+  supplierPayables SupplierPayable[]
+  supplierPayments SupplierPayment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
 }
 
 model Product {
-  id                  String            @id @default(cuid())
-  tenantId            String
-  companyId           String?
-  groupId             String?
-  name                String
-  genericName         String?
-  dosageForm          String?
-  strength            String?
-  packSize            Decimal?          @db.Decimal(10, 3)
-  unit                String?
-  sku                 String
-  taxCategory         String?
-  purchasePrice       Decimal           @db.Decimal(12, 2)
-  sellingPrice        Decimal           @db.Decimal(12, 2)
-  minimumStock        Int               @default(0)
-  reorderQuantity     Int               @default(0)
-  prescriptionRequired Boolean          @default(false)
-  controlledDrug      Boolean           @default(false)
-  isActive            Boolean           @default(true)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company             Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  group               ProductGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  barcodes            ProductBarcode[]
-  suppliers           ProductSupplier[]
-  inventoryBatches    InventoryBatch[]
-  stockLedgerEntries  StockLedgerEntry[]
+  id                   String                @id @default(cuid())
+  tenantId             String
+  companyId            String?
+  groupId              String?
+  name                 String
+  genericName          String?
+  dosageForm           String?
+  strength             String?
+  packSize             Decimal?              @db.Decimal(10, 3)
+  unit                 String?
+  sku                  String
+  taxCategory          String?
+  purchasePrice        Decimal               @db.Decimal(12, 2)
+  sellingPrice         Decimal               @db.Decimal(12, 2)
+  minimumStock         Int                   @default(0)
+  reorderQuantity      Int                   @default(0)
+  prescriptionRequired Boolean               @default(false)
+  controlledDrug       Boolean               @default(false)
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company              Company?              @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  group                ProductGroup?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  barcodes             ProductBarcode[]
+  suppliers            ProductSupplier[]
+  inventoryBatches     InventoryBatch[]
+  stockLedgerEntries   StockLedgerEntry[]
+  purchaseOrderLines   PurchaseOrderLine[]
+  purchaseReceiptLines PurchaseReceiptLine[]
+  purchaseReturnLines  PurchaseReturnLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, name])
@@ -176,25 +191,27 @@ model Product {
 }
 
 model InventoryBatch {
-  id                String   @id @default(cuid())
+  id                String                @id @default(cuid())
   tenantId          String
   branchId          String
   productId         String
   batchNumber       String
   manufacturingDate DateTime?
   expiryDate        DateTime
-  purchaseCost      Decimal  @db.Decimal(12, 2)
-  sellingPrice      Decimal  @db.Decimal(12, 2)
-  quantity          Int      @default(0)
-  status            String   @default("AVAILABLE")
-  recalled          Boolean  @default(false)
-  quarantined       Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  product           Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  purchaseCost      Decimal               @db.Decimal(12, 2)
+  sellingPrice      Decimal               @db.Decimal(12, 2)
+  quantity          Int                   @default(0)
+  status            String                @default("AVAILABLE")
+  recalled          Boolean               @default(false)
+  quarantined       Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch            Branch                @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product           Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
   ledgerEntries     StockLedgerEntry[]
+  receiptLines      PurchaseReceiptLine[]
+  returnLines       PurchaseReturnLine[]
 
   @@unique([tenantId, branchId, productId, batchNumber])
   @@index([tenantId, branchId, productId, expiryDate])
@@ -202,7 +219,7 @@ model InventoryBatch {
 }
 
 model StockLedgerEntry {
-  id                String   @id @default(cuid())
+  id                String         @id @default(cuid())
   tenantId          String
   branchId          String
   batchId           String
@@ -213,16 +230,197 @@ model StockLedgerEntry {
   resultingQuantity Int
   reason            String?
   idempotencyKey    String
-  createdAt         DateTime @default(now())
-  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch            Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
   batch             InventoryBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
-  product           Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  actor             User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  actor             User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, branchId, productId, createdAt])
   @@index([batchId, createdAt])
+}
+
+model PurchaseOrder {
+  id            String              @id @default(cuid())
+  tenantId      String
+  branchId      String
+  supplierId    String
+  orderNumber   String
+  status        String              @default("DRAFT")
+  subtotal      Decimal             @db.Decimal(12, 2)
+  taxTotal      Decimal             @db.Decimal(12, 2)
+  total         Decimal             @db.Decimal(12, 2)
+  requestedById String
+  approvedById  String?
+  approvedAt    DateTime?
+  approvalNote  String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier      Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  requestedBy   User                @relation("PurchaseOrderRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy    User?               @relation("PurchaseOrderApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  lines         PurchaseOrderLine[]
+  receipts      PurchaseReceipt[]
+  returns       PurchaseReturn[]
+  payables      SupplierPayable[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, branchId, status])
+  @@index([supplierId, createdAt])
+}
+
+model PurchaseOrderLine {
+  id               String                @id @default(cuid())
+  purchaseOrderId  String
+  productId        String
+  orderedQuantity  Int
+  receivedQuantity Int                   @default(0)
+  unitCost         Decimal               @db.Decimal(12, 2)
+  taxRate          Decimal               @db.Decimal(5, 2)
+  lineTotal        Decimal               @db.Decimal(12, 2)
+  purchaseOrder    PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product          Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  receiptLines     PurchaseReceiptLine[]
+  returnLines      PurchaseReturnLine[]
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+model PurchaseReceipt {
+  id              String                @id @default(cuid())
+  tenantId        String
+  branchId        String
+  supplierId      String
+  purchaseOrderId String
+  receiptNumber   String
+  total           Decimal               @db.Decimal(12, 2)
+  receivedById    String
+  idempotencyKey  String
+  receivedAt      DateTime              @default(now())
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch          Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier        Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  receivedBy      User                  @relation(fields: [receivedById], references: [id], onDelete: Restrict)
+  lines           PurchaseReceiptLine[]
+  payable         SupplierPayable?
+
+  @@unique([tenantId, receiptNumber])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, branchId, receivedAt])
+  @@index([supplierId, receivedAt])
+}
+
+model PurchaseReceiptLine {
+  id                  String            @id @default(cuid())
+  receiptId           String
+  purchaseOrderLineId String
+  productId           String
+  batchId             String
+  quantity            Int
+  unitCost            Decimal           @db.Decimal(12, 2)
+  taxRate             Decimal           @db.Decimal(5, 2)
+  lineTotal           Decimal           @db.Decimal(12, 2)
+  receipt             PurchaseReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  purchaseOrderLine   PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Restrict)
+  product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch               InventoryBatch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([receiptId])
+  @@index([batchId])
+}
+
+model PurchaseReturn {
+  id              String               @id @default(cuid())
+  tenantId        String
+  branchId        String
+  supplierId      String
+  purchaseOrderId String?
+  returnNumber    String
+  status          String               @default("PENDING_APPROVAL")
+  total           Decimal              @db.Decimal(12, 2)
+  reason          String
+  requestedById   String
+  approvedById    String?
+  approvedAt      DateTime?
+  idempotencyKey  String
+  createdAt       DateTime             @default(now())
+  completedAt     DateTime?
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch          Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier        Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  requestedBy     User                 @relation("PurchaseReturnRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy      User?                @relation("PurchaseReturnApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  lines           PurchaseReturnLine[]
+  payable         SupplierPayable?
+
+  @@unique([tenantId, returnNumber])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, branchId, status])
+}
+
+model PurchaseReturnLine {
+  id                  String             @id @default(cuid())
+  purchaseReturnId    String
+  purchaseOrderLineId String?
+  productId           String
+  batchId             String
+  quantity            Int
+  unitCost            Decimal            @db.Decimal(12, 2)
+  lineTotal           Decimal            @db.Decimal(12, 2)
+  purchaseReturn      PurchaseReturn     @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  purchaseOrderLine   PurchaseOrderLine? @relation(fields: [purchaseOrderLineId], references: [id], onDelete: SetNull)
+  product             Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch               InventoryBatch     @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseReturnId])
+  @@index([batchId])
+}
+
+model SupplierPayable {
+  id              String            @id @default(cuid())
+  tenantId        String
+  supplierId      String
+  purchaseOrderId String?
+  receiptId       String?           @unique
+  returnId        String?           @unique
+  referenceType   String
+  amount          Decimal           @db.Decimal(12, 2)
+  paidAmount      Decimal           @default(0) @db.Decimal(12, 2)
+  status          String            @default("OPEN")
+  dueDate         DateTime?
+  createdAt       DateTime          @default(now())
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier        Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  receipt         PurchaseReceipt?  @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  return          PurchaseReturn?   @relation(fields: [returnId], references: [id], onDelete: SetNull)
+  payments        SupplierPayment[]
+
+  @@index([tenantId, supplierId, status])
+  @@index([dueDate, status])
+}
+
+model SupplierPayment {
+  id             String          @id @default(cuid())
+  tenantId       String
+  supplierId     String
+  payableId      String
+  amount         Decimal         @db.Decimal(12, 2)
+  idempotencyKey String
+  paidAt         DateTime        @default(now())
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier       Supplier        @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  payable        SupplierPayable @relation(fields: [payableId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([payableId, paidAt])
 }
 
 model ProductBarcode {
@@ -250,50 +448,58 @@ model ProductSupplier {
 }
 
 model Branch {
-  id          String        @id @default(cuid())
-  tenantId    String
-  name        String
-  code        String
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userBranches UserBranch[]
-  inventoryBatches InventoryBatch[]
+  id                 String             @id @default(cuid())
+  tenantId           String
+  name               String
+  code               String
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userBranches       UserBranch[]
+  inventoryBatches   InventoryBatch[]
   stockLedgerEntries StockLedgerEntry[]
+  purchaseOrders     PurchaseOrder[]
+  purchaseReceipts   PurchaseReceipt[]
+  purchaseReturns    PurchaseReturn[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
 }
 
 model User {
-  id           String        @id @default(cuid())
-  tenantId     String
-  email        String
-  passwordHash String
-  firstName    String
-  lastName     String
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles    UserRole[]
-  userBranches UserBranch[]
-  auditLogs    AuditLog[]    @relation("AuditActor")
-  stockLedgerEntries StockLedgerEntry[]
+  id                       String             @id @default(cuid())
+  tenantId                 String
+  email                    String
+  passwordHash             String
+  firstName                String
+  lastName                 String
+  isActive                 Boolean            @default(true)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  tenant                   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles                UserRole[]
+  userBranches             UserBranch[]
+  auditLogs                AuditLog[]         @relation("AuditActor")
+  stockLedgerEntries       StockLedgerEntry[]
+  purchaseOrdersCreated    PurchaseOrder[]    @relation("PurchaseOrderRequester")
+  purchaseOrdersApproved   PurchaseOrder[]    @relation("PurchaseOrderApprover")
+  purchaseReceiptsReceived PurchaseReceipt[]
+  purchaseReturnsRequested PurchaseReturn[]   @relation("PurchaseReturnRequester")
+  purchaseReturnsApproved  PurchaseReturn[]   @relation("PurchaseReturnApprover")
 
   @@unique([tenantId, email])
   @@index([tenantId])
 }
 
 model Role {
-  id           String           @id @default(cuid())
-  tenantId     String
-  name         String
-  key          String
-  createdAt    DateTime         @default(now())
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles    UserRole[]
+  id              String           @id @default(cuid())
+  tenantId        String
+  name            String
+  key             String
+  createdAt       DateTime         @default(now())
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
   rolePermissions RolePermission[]
 
   @@unique([tenantId, key])
@@ -301,17 +507,17 @@ model Role {
 }
 
 model Permission {
-  id             String           @id @default(cuid())
-  key            String           @unique
-  description    String
+  id              String           @id @default(cuid())
+  key             String           @unique
+  description     String
   rolePermissions RolePermission[]
 }
 
 model UserRole {
   userId String
   roleId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
 }

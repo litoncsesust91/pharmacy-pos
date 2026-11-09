@@ -9,6 +9,7 @@ import { AuditModule } from './audit/audit.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { InventoryModule } from './inventory/inventory.module.js';
+import { PurchasingModule } from './purchasing/purchasing.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InventoryModule } from './inventory/inventory.module.js';
     SettingsModule,
     CatalogModule,
     InventoryModule,
+    PurchasingModule,
   ],
   providers: [AppConfig],
 })

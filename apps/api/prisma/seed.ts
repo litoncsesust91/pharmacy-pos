@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function main(): Promise<void> {
   await prisma.systemInfo.upsert({
     where: { key: 'schema-version' },
-    update: { value: 'phase-5' },
-    create: { key: 'schema-version', value: 'phase-5' },
+    update: { value: 'phase-6' },
+    create: { key: 'schema-version', value: 'phase-6' },
   });
 
   const bangladesh = await prisma.countryProfile.upsert({
@@ -177,6 +177,13 @@ async function main(): Promise<void> {
     ['inventory.receive', 'Receive stock into batches'],
     ['inventory.sell', 'Allocate stock for sales'],
     ['inventory.adjust', 'Adjust and quarantine stock'],
+    ['purchasing.read', 'View purchasing records and payables'],
+    ['purchasing.manage', 'Manage supplier terms'],
+    ['purchasing.create', 'Create and submit purchase orders'],
+    ['purchasing.approve', 'Approve purchase orders and returns'],
+    ['purchasing.receive', 'Receive approved purchase orders'],
+    ['purchasing.return', 'Create and complete purchase returns'],
+    ['purchasing.pay', 'Record supplier payments'],
   ] as const;
 
   const permissions = await Promise.all(
