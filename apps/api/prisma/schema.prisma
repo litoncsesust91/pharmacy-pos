@@ -32,6 +32,8 @@ model Tenant {
   suppliers   Supplier[]
   products    Product[]
   barcodes    ProductBarcode[]
+  batches     InventoryBatch[]
+  stockLedger StockLedgerEntry[]
 }
 
 model CountryProfile {
@@ -163,12 +165,64 @@ model Product {
   group               ProductGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
   barcodes            ProductBarcode[]
   suppliers           ProductSupplier[]
+  inventoryBatches    InventoryBatch[]
+  stockLedgerEntries  StockLedgerEntry[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, name])
   @@index([tenantId, genericName])
   @@index([companyId])
   @@index([groupId])
+}
+
+model InventoryBatch {
+  id                String   @id @default(cuid())
+  tenantId          String
+  branchId          String
+  productId         String
+  batchNumber       String
+  manufacturingDate DateTime?
+  expiryDate        DateTime
+  purchaseCost      Decimal  @db.Decimal(12, 2)
+  sellingPrice      Decimal  @db.Decimal(12, 2)
+  quantity          Int      @default(0)
+  status            String   @default("AVAILABLE")
+  recalled          Boolean  @default(false)
+  quarantined       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  ledgerEntries     StockLedgerEntry[]
+
+  @@unique([tenantId, branchId, productId, batchNumber])
+  @@index([tenantId, branchId, productId, expiryDate])
+  @@index([tenantId, branchId, status, recalled, quarantined])
+}
+
+model StockLedgerEntry {
+  id                String   @id @default(cuid())
+  tenantId          String
+  branchId          String
+  batchId           String
+  productId         String
+  actorId           String?
+  movementType      String
+  quantityDelta     Int
+  resultingQuantity Int
+  reason            String?
+  idempotencyKey    String
+  createdAt         DateTime @default(now())
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  batch             InventoryBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  actor             User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, branchId, productId, createdAt])
+  @@index([batchId, createdAt])
 }
 
 model ProductBarcode {
@@ -205,6 +259,8 @@ model Branch {
   updatedAt   DateTime      @updatedAt
   tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userBranches UserBranch[]
+  inventoryBatches InventoryBatch[]
+  stockLedgerEntries StockLedgerEntry[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -224,6 +280,7 @@ model User {
   userRoles    UserRole[]
   userBranches UserBranch[]
   auditLogs    AuditLog[]    @relation("AuditActor")
+  stockLedgerEntries StockLedgerEntry[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
