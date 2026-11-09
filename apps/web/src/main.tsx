@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fetchProducts, getToken, login, paySale, syncSale } from './api';
@@ -12,6 +12,13 @@ import {
   type QueuedSale,
 } from './offline';
 import './styles.css';
+import { isSafeScannerValue, normalizeScannerValue } from './barcode';
+import { browserHardware } from './hardware';
+
+interface InstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 const demoProducts: PosProduct[] = [
   { id: 'demo-para', name: 'Paracetamol 500 mg', sku: 'PARA-500-TAB', sellingPrice: 2 },
@@ -35,6 +42,8 @@ function App(): ReactElement {
   const [queued, setQueued] = useState<QueuedSale[]>([]);
   const [notice, setNotice] = useState('Ready for a new sale');
   const [customerId, setCustomerId] = useState('');
+  const [isInstallable, setIsInstallable] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const refreshQueue = async () => setQueued(await listQueuedSales());
 
@@ -47,9 +56,17 @@ function App(): ReactElement {
     const offline = () => setIsOnline(false);
     window.addEventListener('online', online);
     window.addEventListener('offline', offline);
+    const installPrompt = (event: Event) => {
+      event.preventDefault();
+      setIsInstallable(true);
+      window.__posInstallPrompt = event as InstallPromptEvent;
+    };
+    window.addEventListener('beforeinstallprompt', installPrompt);
+    void navigator.serviceWorker?.register('/sw.js').catch(() => undefined);
     return () => {
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
+      window.removeEventListener('beforeinstallprompt', installPrompt);
     };
   }, []);
 
@@ -67,6 +84,17 @@ function App(): ReactElement {
       return [...current, { ...product, quantity: 1, discountAmount: 0 }];
     });
     setNotice(`${product.name} added`);
+  }
+
+  function handleScannerInput() {
+    const value = normalizeScannerValue(search);
+    const exactProduct = isSafeScannerValue(value) ? products.find((product) => product.sku.toLowerCase() === value.toLowerCase()) : undefined;
+    if (exactProduct) {
+      addProduct(exactProduct);
+      setSearch('');
+      return;
+    }
+    if (visibleProducts[0]) addProduct(visibleProducts[0]);
   }
 
   function updateQuantity(id: string, quantity: number) {
@@ -142,11 +170,38 @@ function App(): ReactElement {
     setCustomerId('');
   }
 
+  useEffect(() => {
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'F4') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (event.key === 'F2' && cart.length > 0) {
+        event.preventDefault();
+        void checkout('COMPLETED');
+      }
+      if (event.key === 'Escape') {
+        setSearch('');
+      }
+    };
+    window.addEventListener('keydown', keyboard);
+    return () => window.removeEventListener('keydown', keyboard);
+  }, [cart.length]);
+
+  async function installApp() {
+    const prompt = window.__posInstallPrompt;
+    if (!prompt) return;
+    await prompt.prompt();
+    await prompt.userChoice;
+    window.__posInstallPrompt = undefined;
+    setIsInstallable(false);
+  }
+
   return (
     <main className="pos-shell">
       <header className="topbar">
         <div>
-          <p className="kicker">PHARMACY POS / PHASE 07</p>
+            <p className="kicker">PHARMACY POS / PHASE 13</p>
           <h1>Counter desk</h1>
         </div>
         <div className="connection" role="status">
@@ -165,11 +220,12 @@ function App(): ReactElement {
             <span className="count-badge">{products.length} cached</span>
           </div>
           <input
+            ref={searchInputRef}
             className="search-input"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && visibleProducts[0]) addProduct(visibleProducts[0]);
+              if (event.key === 'Enter') handleScannerInput();
             }}
             placeholder="Scan barcode or search SKU / name"
             aria-label="Search product catalog"
@@ -184,7 +240,7 @@ function App(): ReactElement {
               </button>
             ))}
           </div>
-          <p className="keyboard-note"><kbd>Enter</kbd> adds the first result <kbd>F4</kbd> focuses search</p>
+           <p className="keyboard-note"><kbd>Enter</kbd> scans/adds <kbd>F2</kbd> completes <kbd>F4</kbd> focuses search</p>
         </div>
 
         <aside className="cart-panel">
@@ -204,7 +260,8 @@ function App(): ReactElement {
           </div>
           <label className="compact-label">Customer ID (optional)<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="Select from customer records" /></label>
           <div className="totals"><span>Subtotal <b>৳ {subtotal.toFixed(2)}</b></span><span>Discount <b>− ৳ {discount.toFixed(2)}</b></span><span className="grand-total">Total <b>৳ {total.toFixed(2)}</b></span></div>
-          <div className="checkout-actions"><button className="secondary-action" onClick={() => void checkout('SUSPENDED')} disabled={!cart.length}>Suspend</button><button className="primary-action" onClick={() => void checkout('COMPLETED')} disabled={!cart.length}>Complete sale <span>F2</span></button></div>
+           <div className="checkout-actions"><button className="secondary-action" onClick={() => void checkout('SUSPENDED')} disabled={!cart.length}>Suspend</button><button className="primary-action" onClick={() => void checkout('COMPLETED')} disabled={!cart.length}>Complete sale <span>F2</span></button></div>
+           <button className="receipt-action" onClick={() => void browserHardware.printReceipt(`Pharmacy POS\nTotal: ${total.toFixed(2)}`)} disabled={!cart.length}>Preview receipt</button>
           <p className="notice" role="status">{notice}</p>
         </aside>
       </section>
@@ -218,7 +275,7 @@ function App(): ReactElement {
           <input value={branchId} onChange={(event) => setBranchId(event.target.value)} aria-label="Branch ID" placeholder="Branch ID" />
           <button className="connect-button">Connect</button>
         </form>
-        <div className="sync-card"><div><p className="section-label">Outbox</p><strong>{queued.length ? `${queued.length} sale${queued.length === 1 ? '' : 's'} waiting` : 'All synchronized'}</strong></div><button onClick={() => void syncOutbox()} disabled={!queued.length || !isOnline || !getToken()}>Sync now</button></div>
+         <div className="sync-card"><div><p className="section-label">Outbox</p><strong>{queued.length ? `${queued.length} sale${queued.length === 1 ? '' : 's'} waiting` : 'All synchronized'}</strong></div><button onClick={() => void syncOutbox()} disabled={!queued.length || !isOnline || !getToken()}>Sync now</button>{isInstallable && <button onClick={() => void installApp()}>Install app</button>}</div>
       </section>
     </main>
   );

@@ -15,6 +15,8 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { ReportsModule } from './reports/reports.module.js';
     PrescriptionsModule,
     JobsModule,
     ReportsModule,
+    SubscriptionsModule,
+    ObservabilityModule,
   ],
   providers: [AppConfig],
 })

@@ -1,14 +1,16 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import type { CreateBranchDto } from './dto/create-branch.dto.js';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
 
 @Injectable()
 export class TenantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly subscriptions?: SubscriptionsService,
   ) {}
 
   getCurrent(user: AuthenticatedUser) {
@@ -26,6 +28,7 @@ export class TenantsService {
   }
 
   async createBranch(user: AuthenticatedUser, input: CreateBranchDto) {
+    await this.subscriptions?.assertWithinLimit(user, 'branches');
     const code = input.code.trim().toUpperCase();
     const existing = await this.prisma.branch.findUnique({
       where: { tenantId_code: { tenantId: user.tenantId, code } },

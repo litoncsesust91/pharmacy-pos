@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service.js';
@@ -16,6 +17,7 @@ import type {
   ProductQueryDto,
   UpdateProductDto,
 } from './dto/catalog.dto.js';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
 
 const productInclude = {
   company: true,
@@ -29,6 +31,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly subscriptions?: SubscriptionsService,
   ) {}
 
   listCompanies(user: AuthenticatedUser) {
@@ -174,6 +177,7 @@ export class CatalogService {
   }
 
   async createProduct(user: AuthenticatedUser, input: CreateProductDto) {
+    await this.subscriptions?.assertWithinLimit(user, 'products');
     await this.assertReferences(user, input.companyId, input.groupId, input.supplierIds);
     this.assertNoDuplicates(input.barcodes, 'Barcode values must be unique');
     this.assertNoDuplicates(input.supplierIds, 'Supplier values must be unique');

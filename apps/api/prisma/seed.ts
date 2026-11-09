@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function main(): Promise<void> {
   await prisma.systemInfo.upsert({
     where: { key: 'schema-version' },
-    update: { value: 'phase-11' },
-    create: { key: 'schema-version', value: 'phase-11' },
+    update: { value: 'phase-14' },
+    create: { key: 'schema-version', value: 'phase-14' },
   });
 
   const bangladesh = await prisma.countryProfile.upsert({
@@ -52,6 +52,27 @@ async function main(): Promise<void> {
     where: { slug: 'demo-pharmacy' },
     update: { name: 'Demo Pharmacy', isActive: true },
     create: { name: 'Demo Pharmacy', slug: 'demo-pharmacy' },
+  });
+
+  const starterPlan = await prisma.subscriptionPlan.upsert({
+    where: { key: 'starter' },
+    update: { name: 'Starter', monthlyPrice: 999, limits: { branches: 1, users: 5, products: 1000, monthlySales: 5000 }, isActive: true },
+    create: { key: 'starter', name: 'Starter', monthlyPrice: 999, currencyCode: 'BDT', limits: { branches: 1, users: 5, products: 1000, monthlySales: 5000 } },
+  });
+  await prisma.subscriptionPlan.upsert({
+    where: { key: 'growth' },
+    update: { name: 'Growth', monthlyPrice: 2999, limits: { branches: 5, users: 25, products: 10000, monthlySales: 25000 }, isActive: true },
+    create: { key: 'growth', name: 'Growth', monthlyPrice: 2999, currencyCode: 'BDT', limits: { branches: 5, users: 25, products: 10000, monthlySales: 25000 } },
+  });
+  const periodStart = new Date();
+  const periodEnd = new Date(periodStart);
+  periodEnd.setUTCDate(periodEnd.getUTCDate() + 30);
+  const trialEndsAt = new Date(periodStart);
+  trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 14);
+  await prisma.tenantSubscription.upsert({
+    where: { tenantId: tenant.id },
+    update: { planId: starterPlan.id },
+    create: { tenantId: tenant.id, planId: starterPlan.id, status: 'TRIALING', currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, trialEndsAt },
   });
 
   const branch = await prisma.branch.upsert({
@@ -205,6 +226,8 @@ async function main(): Promise<void> {
     ['jobs.manage', 'Queue and retry background jobs'],
     ['reports.read', 'Run tenant-scoped reports'],
     ['reports.export', 'Export reports as CSV or PDF'],
+    ['subscription.read', 'View subscription and plan usage'],
+    ['subscription.manage', 'Change or cancel the tenant subscription'],
   ] as const;
 
   const permissions = await Promise.all(

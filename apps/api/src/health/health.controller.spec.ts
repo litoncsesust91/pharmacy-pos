@@ -18,4 +18,12 @@ describe('HealthController', () => {
       service: 'pharmacy-pos-api',
     });
   });
+
+  it('reports degraded readiness when no database provider is configured', async () => {
+    await expect(controller.getReadiness()).resolves.toEqual({
+      status: 'degraded',
+      service: 'pharmacy-pos-api',
+      database: 'unavailable',
+    });
+  });
 });

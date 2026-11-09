@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service.js';
@@ -15,6 +16,7 @@ import type {
   CustomerQueryDto,
   SaleQueryDto,
 } from './dto/sales.dto.js';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service.js';
 
 const saleInclude = {
   customer: true,
@@ -35,6 +37,7 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly subscriptions?: SubscriptionsService,
   ) {}
 
   listCustomers(user: AuthenticatedUser, query: CustomerQueryDto) {
@@ -95,6 +98,7 @@ export class SalesService {
   }
 
   async createSale(user: AuthenticatedUser, input: CreateSaleDto) {
+    await this.subscriptions?.assertWithinLimit(user, 'monthlySales');
     this.assertBranch(user, input.branchId);
     const existing = await this.prisma.sale.findUnique({
       where: { tenantId_idempotencyKey: { tenantId: user.tenantId, idempotencyKey: input.idempotencyKey } },

@@ -1,0 +1,9 @@
+{
+  "name": "Pharmacy POS",
+  "short_name": "Pharmacy POS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e7e8df",
+  "theme_color": "#16816f",
+  "description": "Offline-first pharmacy point of sale"
+}

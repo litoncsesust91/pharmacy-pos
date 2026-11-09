@@ -34,6 +34,7 @@ export class AuthService {
     if (!user || !(await argon2.verify(user.passwordHash, input.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    await this.assertSubscription(user.tenantId);
 
     const authenticatedUser = this.toAuthenticatedUser(user);
     const accessToken = await this.jwt.signAsync({
@@ -68,6 +69,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User is not active or no longer exists');
     }
+    await this.assertSubscription(user.tenantId);
 
     return this.toAuthenticatedUser(user);
   }
@@ -90,5 +92,13 @@ export class AuthService {
         ),
       ],
     };
+  }
+
+  private async assertSubscription(tenantId: string) {
+    const subscription = await this.prisma.tenantSubscription.findUnique({ where: { tenantId }, select: { status: true, trialEndsAt: true, currentPeriodEnd: true } });
+    if (!subscription) throw new UnauthorizedException('Tenant subscription is not configured');
+    const now = new Date();
+    const expired = (subscription.status === 'TRIALING' && !!subscription.trialEndsAt && subscription.trialEndsAt <= now) || (subscription.status === 'ACTIVE' && subscription.currentPeriodEnd <= now);
+    if (expired || ['SUSPENDED', 'CANCELED'].includes(subscription.status)) throw new UnauthorizedException('Tenant subscription is not active');
   }
 }
