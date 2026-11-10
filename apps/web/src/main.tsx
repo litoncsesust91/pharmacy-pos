@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fetchProducts, getToken, login, paySale, syncSale } from './api';
+import { clearSession, fetchProducts, getSessionUser, getToken, login, paySale, syncSale, type SessionUser } from './api';
 import {
   cacheProducts,
   enqueueSale,
@@ -12,6 +12,7 @@ import {
   type QueuedSale,
 } from './offline';
 import './styles.css';
+import { ManagerView } from './manager';
 import { isSafeScannerValue, normalizeScannerValue } from './barcode';
 import { browserHardware } from './hardware';
 
@@ -29,20 +30,39 @@ const demoProducts: PosProduct[] = [
 
 type CartLine = PosProduct & { quantity: number; discountAmount: number };
 
+function LoginScreen({ onAuthenticated }: { onAuthenticated: (user: SessionUser) => Promise<void> }): ReactElement {
+  const [email, setEmail] = useState('owner@demo.local');
+  const [password, setPassword] = useState('ChangeMe123!');
+  const [tenantSlug, setTenantSlug] = useState('demo-pharmacy');
+  const [message, setMessage] = useState('Sign in to access the POS and admin workspace');
+  const [loading, setLoading] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      const user = await login(email, password, tenantSlug);
+      await onAuthenticated(user);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Login failed');
+    } finally { setLoading(false); }
+  }
+
+  return <main className="login-screen"><section className="login-panel"><p className="kicker">PHARMACY POS / SECURE ACCESS</p><h1>Sign in</h1><p className="manager-intro">Authentication is required before using sales, catalog, customer, or administration features.</p><form className="form-stack" onSubmit={(event) => void submit(event)}><input required value={email} onChange={(event) => setEmail(event.target.value)} aria-label="Email" placeholder="Email" type="email" /><input required value={password} onChange={(event) => setPassword(event.target.value)} aria-label="Password" placeholder="Password" type="password" /><input required value={tenantSlug} onChange={(event) => setTenantSlug(event.target.value)} aria-label="Tenant slug" placeholder="Tenant slug" /><button className="primary-action" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button></form><p className="notice" role="status">{message}</p></section></main>;
+}
+
 function App(): ReactElement {
   const [products, setProducts] = useState<PosProduct[]>(demoProducts);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [email, setEmail] = useState('owner@demo.local');
-  const [password, setPassword] = useState('ChangeMe123!');
-  const [tenantSlug, setTenantSlug] = useState('demo-pharmacy');
-  const [loginMessage, setLoginMessage] = useState('Local-first mode');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queued, setQueued] = useState<QueuedSale[]>([]);
   const [notice, setNotice] = useState('Ready for a new sale');
   const [customerId, setCustomerId] = useState('');
+  const [activeView, setActiveView] = useState<'pos' | 'manager'>('pos');
   const [isInstallable, setIsInstallable] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(() => getToken() ? getSessionUser() : null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const refreshQueue = async () => setQueued(await listQueuedSales());
@@ -101,19 +121,24 @@ function App(): ReactElement {
     setCart((current) => current.flatMap((line) => line.id === id ? (quantity > 0 ? [{ ...line, quantity }] : []) : [line]));
   }
 
-  async function handleLogin(event: FormEvent) {
-    event.preventDefault();
+  async function handleAuthenticated(user: SessionUser) {
+    setSessionUser(user);
+    if (user.branchIds[0]) setBranchId(user.branchIds[0]);
     try {
-      const user = await login(email, password, tenantSlug);
-      if (!user.branchIds.includes(branchId) && user.branchIds[0]) setBranchId(user.branchIds[0]);
       const remote = await fetchProducts();
       setProducts(remote);
       await cacheProducts(remote);
-      setLoginMessage('Connected and catalog cached');
       setNotice('Online catalog synchronized');
-    } catch {
-      setLoginMessage('Login failed; local mode remains available');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Catalog could not be synchronized');
     }
+  }
+
+  function logout() {
+    clearSession();
+    setSessionUser(null);
+    setActiveView('pos');
+    setCart([]);
   }
 
   async function syncOutbox() {
@@ -198,6 +223,10 @@ function App(): ReactElement {
     setIsInstallable(false);
   }
 
+  if (!sessionUser) return <LoginScreen onAuthenticated={handleAuthenticated} />;
+  const canAccessAdmin = sessionUser.permissions.some((permission) => ['catalog.manage', 'sales.manage', 'inventory.adjust', 'purchasing.manage', 'reports.read', 'settings.manage', 'subscription.read', 'branch.manage', 'jobs.read'].includes(permission));
+  if (activeView === 'manager') return <ManagerView permissions={sessionUser.permissions} onBack={() => setActiveView('pos')} onLogout={logout} />;
+
   return (
     <main className="pos-shell">
       <header className="topbar">
@@ -205,9 +234,10 @@ function App(): ReactElement {
             <p className="kicker">PHARMACY POS / PHASE 13</p>
           <h1>Counter desk</h1>
         </div>
-        <div className="connection" role="status">
+         <div className="connection" role="status">
           <span className={`connection-dot ${isOnline ? 'is-online' : ''}`} />
-          {isOnline ? 'Online' : 'Offline'} <strong>{queued.length} queued</strong>
+           {isOnline ? 'Online' : 'Offline'} <strong>{queued.length} queued</strong>
+           {canAccessAdmin && <button className="manager-link" onClick={() => setActiveView('manager')}>Admin</button>}
         </div>
       </header>
 
@@ -268,14 +298,7 @@ function App(): ReactElement {
       </section>
 
       <section className="utility-row">
-        <form className="login-card" onSubmit={(event) => void handleLogin(event)}>
-          <div><p className="section-label">Secure connection</p><strong>{loginMessage}</strong></div>
-          <input value={email} onChange={(event) => setEmail(event.target.value)} aria-label="Email" placeholder="Email" />
-          <input value={password} onChange={(event) => setPassword(event.target.value)} aria-label="Password" placeholder="Password" type="password" />
-          <input value={tenantSlug} onChange={(event) => setTenantSlug(event.target.value)} aria-label="Tenant slug" placeholder="Tenant slug" />
-          <input value={branchId} onChange={(event) => setBranchId(event.target.value)} aria-label="Branch ID" placeholder="Branch ID" />
-          <button className="connect-button">Connect</button>
-        </form>
+         <div className="login-card session-card"><div><p className="section-label">Secure connection</p><strong>Signed in to {sessionUser.tenantId}</strong></div><span className="helper-text">{sessionUser.permissions.length} permissions · branch {branchId || 'unassigned'}</span><button className="connect-button" onClick={logout}>Sign out</button></div>
          <div className="sync-card"><div><p className="section-label">Outbox</p><strong>{queued.length ? `${queued.length} sale${queued.length === 1 ? '' : 's'} waiting` : 'All synchronized'}</strong></div><button onClick={() => void syncOutbox()} disabled={!queued.length || !isOnline || !getToken()}>Sync now</button>{isInstallable && <button onClick={() => void installApp()}>Install app</button>}</div>
       </section>
     </main>

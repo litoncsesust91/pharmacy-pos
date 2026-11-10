@@ -1,6 +1,7 @@
 import type { PosProduct } from './offline';
 
-const apiBase = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL : '/api';
+const configuredApi = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
+const apiBase = configuredApi ? (configuredApi.endsWith('/api') ? configuredApi : `${configuredApi}/api`) : '/api';
 
 export function getToken(): string | null {
   const token = sessionStorage.getItem('pos-access-token');
@@ -32,16 +33,37 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
       ...options.headers,
     },
   });
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) {
+    const raw = await response.text();
+    let message: string | undefined;
+    try {
+      const error = JSON.parse(raw) as { message?: string | string[] };
+      message = Array.isArray(error.message) ? error.message.join(', ') : error.message;
+    } catch { /* The API may return a non-JSON proxy error. */ }
+    throw new Error(message ?? `Request failed with status ${response.status}`);
+  }
   return response.json() as Promise<T>;
 }
 
-export async function login(email: string, password: string, tenantSlug: string): Promise<{ branchIds: string[] }> {
-  const result = await apiRequest<{ accessToken: string; user: { branchIds: string[] } }>('/auth/login', {
+export type SessionUser = { id: string; tenantId: string; branchIds: string[]; permissions: string[] };
+
+export function getSessionUser(): SessionUser | null {
+  try { return JSON.parse(sessionStorage.getItem('pos-user') ?? 'null') as SessionUser | null; } catch { return null; }
+}
+
+export function clearSession(): void {
+  sessionStorage.removeItem('pos-user');
+  sessionStorage.removeItem('pos-access-token');
+  sessionStorage.removeItem('pos-session-expires');
+}
+
+export async function login(email: string, password: string, tenantSlug: string): Promise<SessionUser> {
+  const result = await apiRequest<{ accessToken: string; user: SessionUser }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password, tenantSlug }),
   });
   setToken(result.accessToken);
+  sessionStorage.setItem('pos-user', JSON.stringify(result.user));
   return result.user;
 }
 
