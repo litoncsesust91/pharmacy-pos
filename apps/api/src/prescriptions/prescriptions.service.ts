@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -111,6 +111,9 @@ export class PrescriptionsService {
 
   async addDocument(user: AuthenticatedUser, prescriptionId: string, input: CreatePrescriptionDocumentDto) {
     await this.getPrescription(user, prescriptionId);
+    const content = input.contentBase64 ? Buffer.from(input.contentBase64, 'base64') : undefined;
+    if (content && content.length !== input.sizeBytes) throw new BadRequestException('Document size does not match content');
+    if (content && createHash('sha256').update(content).digest('hex') !== input.sha256.toLowerCase()) throw new BadRequestException('Document checksum does not match content');
     const document = await this.prisma.prescriptionDocument.create({
       data: {
         tenantId: user.tenantId,
@@ -122,6 +125,7 @@ export class PrescriptionsService {
         sizeBytes: input.sizeBytes,
         sha256: input.sha256.toLowerCase(),
         encrypted: true,
+        content: content ? this.encrypt(content) : undefined,
       },
       select: { id: true, fileName: true, mimeType: true, sizeBytes: true, sha256: true, encrypted: true, createdAt: true },
     });
@@ -139,6 +143,21 @@ export class PrescriptionsService {
     const accessToken = createHmac('sha256', secret).update(value).digest('hex');
     await this.recordAudit(user, 'prescription.document.accessed', document.id, { expiresAt });
     return { documentId: document.id, objectKey: document.objectKey, expiresAt, accessToken };
+  }
+
+  async downloadDocument(user: AuthenticatedUser, prescriptionId: string, documentId: string, expiresAtValue: string, accessToken: string) {
+    const expiresAt = Number(expiresAtValue);
+    if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) throw new ForbiddenException('Document access link expired');
+    const document = await this.prisma.prescriptionDocument.findFirst({ where: { id: documentId, tenantId: user.tenantId, prescriptionId, deletedAt: null } });
+    if (!document || !document.content) throw new NotFoundException('Document content not available');
+    const value = `${document.id}.${expiresAt}`;
+    const secret = process.env.DOCUMENT_ACCESS_SECRET ?? process.env.JWT_SECRET ?? 'local-document-secret';
+    const expected = createHmac('sha256', secret).update(value).digest('hex');
+    const provided = Buffer.from(accessToken, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    if (provided.length !== expectedBuffer.length || !timingSafeEqual(provided, expectedBuffer)) throw new ForbiddenException('Invalid document access token');
+    await this.recordAudit(user, 'prescription.document.downloaded', document.id, { expiresAt });
+    return { fileName: document.fileName, mimeType: document.mimeType, content: this.decrypt(document.content) };
   }
 
   async deleteDocument(user: AuthenticatedUser, prescriptionId: string, documentId: string) {
@@ -164,4 +183,8 @@ export class PrescriptionsService {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(message);
     throw error;
   }
+
+  private encryptionKey() { return createHash('sha256').update(process.env.DOCUMENT_ENCRYPTION_SECRET ?? process.env.JWT_SECRET ?? 'local-document-encryption-secret').digest(); }
+  private encrypt(content: Buffer) { const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', this.encryptionKey(), iv); const encrypted = Buffer.concat([cipher.update(content), cipher.final()]); return Buffer.concat([iv, cipher.getAuthTag(), encrypted]); }
+  private decrypt(content: Uint8Array) { const value = Buffer.from(content); const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey(), value.subarray(0, 12)); decipher.setAuthTag(value.subarray(12, 28)); return Buffer.concat([decipher.update(value.subarray(28)), decipher.final()]); }
 }

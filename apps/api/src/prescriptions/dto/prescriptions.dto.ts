@@ -9,6 +9,7 @@ import {
   IsString,
   Length,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -102,4 +103,9 @@ export class CreatePrescriptionDocumentDto {
   @IsString()
   @Length(64, 64)
   sha256!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(13_981_016)
+  contentBase64?: string;
 }

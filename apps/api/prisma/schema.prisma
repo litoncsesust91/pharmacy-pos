@@ -336,6 +336,7 @@ model PrescriptionDocument {
   sizeBytes      Int
   sha256         String
   encrypted      Boolean      @default(true)
+  content        Bytes?
   createdAt      DateTime     @default(now())
   deletedAt      DateTime?
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)

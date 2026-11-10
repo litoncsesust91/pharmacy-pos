@@ -77,7 +77,7 @@ export class ReportsService {
       const product = line.product;
       return (!query.productId || product.id === query.productId) && (!query.companyId || product.companyId === query.companyId) && (!query.groupId || product.groupId === query.groupId) && (!query.batchId || line.batchId === query.batchId) && (!query.supplierId || product.suppliers.some((supplier) => supplier.supplierId === query.supplierId));
     }).map((line) => ({
-      saleId: sale.id, saleNumber: sale.saleNumber, date: sale.createdAt.toISOString(), branch: sale.branch.code, cashier: `${sale.cashier.firstName} ${sale.cashier.lastName}`.trim(), paymentMethod: sale.paymentMethod ?? '', product: line.productName, sku: line.sku, batch: line.batch?.batchNumber ?? '', quantity: line.quantity, revenue: this.number(line.lineTotal), tax: this.number(line.taxAmount), cost: this.number(line.batch?.purchaseCost ?? line.product.purchasePrice) * line.quantity, profit: this.number(line.lineTotal) - this.number(line.batch?.purchaseCost ?? line.product.purchasePrice) * line.quantity,
+      saleId: sale.id, saleNumber: sale.saleNumber, date: sale.createdAt.toISOString(), period: this.period(sale.createdAt, query.type), branch: sale.branch.code, cashier: `${sale.cashier.firstName} ${sale.cashier.lastName}`.trim(), paymentMethod: sale.paymentMethod ?? '', product: line.productName, sku: line.sku, batch: line.batch?.batchNumber ?? '', quantity: line.quantity, revenue: this.number(line.lineTotal), tax: this.number(line.taxAmount), cost: this.number(line.batch?.purchaseCost ?? line.product.purchasePrice) * line.quantity, profit: this.number(line.lineTotal) - this.number(line.batch?.purchaseCost ?? line.product.purchasePrice) * line.quantity,
     })));
     const paged = this.page(rows, query);
     const summary = rows.reduce((sum, row) => ({ quantity: sum.quantity + Number(row.quantity), revenue: sum.revenue + Number(row.revenue), tax: sum.tax + Number(row.tax), cost: sum.cost + Number(row.cost), profit: sum.profit + Number(row.profit) }), { quantity: 0, revenue: 0, tax: 0, cost: 0, profit: 0 });
@@ -112,6 +112,7 @@ export class ReportsService {
 
   private dateRange(query: ReportQueryDto) { const range: { gte?: Date; lt?: Date } = {}; if (query.from) range.gte = new Date(query.from); if (query.to) { const end = new Date(query.to); end.setUTCDate(end.getUTCDate() + 1); range.lt = end; } return range; }
   private hash(token: string) { return createHash('sha256').update(token).digest('hex'); }
+  private period(date: Date, type: ReportType) { if (type === 'DAILY_SALES') return date.toISOString().slice(0, 10); if (type === 'MONTHLY_SALES') return date.toISOString().slice(0, 7); if (type === 'YEARLY_SALES') return date.toISOString().slice(0, 4); return ''; }
   private page(rows: Record<string, unknown>[], query: ReportQueryDto) { return rows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize); }
   private number(value: Prisma.Decimal | number) { return typeof value === 'number' ? value : value.toNumber(); }
   private roundSummary(summary: Record<string, number>) { return Object.fromEntries(Object.entries(summary).map(([key, value]) => [key, Math.round(value * 100) / 100])); }
@@ -120,7 +121,7 @@ export class ReportsService {
     const columns = first ? Object.keys(first) : ['result'];
     const stringify = (value: unknown) => {
       if (value === null || value === undefined) return '';
-      if (typeof value === 'string') return value;
+      if (typeof value === 'string') return /^[=+\-@]/.test(value) ? `'${value}` : value;
       if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value.toString();
       return JSON.stringify(value);
     };

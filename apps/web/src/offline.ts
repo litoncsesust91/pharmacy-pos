@@ -13,10 +13,11 @@ export type QueuedSale = {
   createdAt: string;
   attempts: number;
   lastError?: string;
+  status?: 'QUEUED' | 'FAILED';
 };
 
 const databaseName = 'pharmacy-pos-phase-7';
-const databaseVersion = 1;
+const databaseVersion = 2;
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -25,6 +26,7 @@ function openDatabase(): Promise<IDBDatabase> {
       const database = request.result;
       if (!database.objectStoreNames.contains('catalog')) database.createObjectStore('catalog', { keyPath: 'id' });
       if (!database.objectStoreNames.contains('outbox')) database.createObjectStore('outbox', { keyPath: 'id' });
+      if (!database.objectStoreNames.contains('metadata')) database.createObjectStore('metadata', { keyPath: 'key' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error(request.error?.message ?? 'IndexedDB open failed'));
@@ -34,24 +36,32 @@ function openDatabase(): Promise<IDBDatabase> {
 export async function cacheProducts(products: PosProduct[]): Promise<void> {
   const database = await openDatabase();
   await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction('catalog', 'readwrite');
+    const transaction = database.transaction(['catalog', 'metadata'], 'readwrite');
     transaction.objectStore('catalog').clear();
     products.forEach((product) => transaction.objectStore('catalog').put(product));
+    transaction.objectStore('metadata').put({ key: 'catalog.cachedAt', value: Date.now() });
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(new Error(transaction.error?.message ?? 'IndexedDB write failed'));
   });
   database.close();
 }
 
-export async function readCachedProducts(): Promise<PosProduct[]> {
+export async function readCachedProducts(maxAgeMs = 24 * 60 * 60 * 1000): Promise<PosProduct[]> {
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
-    const request = database.transaction('catalog').objectStore('catalog').getAll();
-    request.onsuccess = () => {
+    const transaction = database.transaction(['catalog', 'metadata']);
+    const metadataRequest = transaction.objectStore('metadata').get('catalog.cachedAt');
+    const productsRequest = transaction.objectStore('catalog').getAll();
+    transaction.oncomplete = () => {
+      const cachedAt = (metadataRequest.result as { value?: number } | undefined)?.value;
       database.close();
-      resolve(request.result as PosProduct[]);
+      if (!cachedAt || !isCacheFresh(cachedAt, Date.now(), maxAgeMs)) {
+        resolve([]);
+        return;
+      }
+      resolve(productsRequest.result as PosProduct[]);
     };
-    request.onerror = () => reject(new Error(request.error?.message ?? 'IndexedDB read failed'));
+    transaction.onerror = () => reject(new Error(transaction.error?.message ?? 'IndexedDB read failed'));
   });
 }
 
@@ -64,6 +74,10 @@ export async function enqueueSale(sale: QueuedSale): Promise<void> {
     transaction.onerror = () => reject(new Error(transaction.error?.message ?? 'IndexedDB write failed'));
   });
   database.close();
+}
+
+export function isCacheFresh(cachedAt: number, now = Date.now(), maxAgeMs = 24 * 60 * 60 * 1000): boolean {
+  return cachedAt > 0 && now >= cachedAt && now - cachedAt <= maxAgeMs;
 }
 
 export async function listQueuedSales(): Promise<QueuedSale[]> {

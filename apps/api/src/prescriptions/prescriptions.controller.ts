@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CurrentUser, RequirePermissions } from '../auth/auth.decorators.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import {
@@ -61,6 +62,22 @@ export class PrescriptionsController {
     @Param('documentId') documentId: string,
   ) {
     return this.prescriptions.accessDocument(user, prescriptionId, documentId);
+  }
+
+  @Get(':prescriptionId/documents/:documentId/download')
+  @RequirePermissions('prescription.document')
+  async downloadDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('prescriptionId') prescriptionId: string,
+    @Param('documentId') documentId: string,
+    @Query('expiresAt') expiresAt: string,
+    @Query('accessToken') accessToken: string,
+    @Res() response: Response,
+  ) {
+    const document = await this.prescriptions.downloadDocument(user, prescriptionId, documentId, expiresAt, accessToken);
+    response.setHeader('Content-Type', document.mimeType);
+    response.setHeader('Content-Disposition', `attachment; filename="${document.fileName.replace(/["\r\n]/g, '')}"`);
+    return response.send(document.content);
   }
 
   @Delete(':prescriptionId/documents/:documentId')

@@ -127,7 +127,8 @@ function App(): ReactElement {
         }
         await removeQueuedSale(item.id);
       } catch (error) {
-        await enqueueSale({ ...item, attempts: item.attempts + 1, lastError: String(error) });
+          const attempts = item.attempts + 1;
+          await enqueueSale({ ...item, attempts, status: attempts >= 5 ? 'FAILED' : 'QUEUED', lastError: String(error) });
       }
     }
     await refreshQueue();

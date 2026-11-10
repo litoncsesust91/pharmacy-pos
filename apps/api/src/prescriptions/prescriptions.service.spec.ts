@@ -45,4 +45,26 @@ describe('PrescriptionsService', () => {
 
     await expect(service.listDocuments(user, 'prescription-other-tenant')).rejects.toThrow(NotFoundException);
   });
+
+  it('rejects document content with a mismatched checksum', async () => {
+    const service = new PrescriptionsService(
+      {
+        prescription: { findFirst: jest.fn().mockResolvedValue({ id: 'prescription-a' }) },
+      } as never,
+      {} as never,
+    );
+
+    await expect(service.addDocument(user, 'prescription-a', {
+      fileName: 'rx.txt',
+      mimeType: 'application/pdf',
+      sizeBytes: 3,
+      sha256: '0'.repeat(64),
+      contentBase64: Buffer.from('rx!').toString('base64'),
+    })).rejects.toThrow('Document checksum does not match content');
+  });
+
+  it('rejects an invalid expiring document token', async () => {
+    const service = new PrescriptionsService({ prescriptionDocument: { findFirst: jest.fn().mockResolvedValue({ id: 'document-a', content: Buffer.from('invalid') }) } } as never, {} as never);
+    await expect(service.downloadDocument(user, 'prescription-a', 'document-a', String(Date.now() + 60_000), 'bad-token')).rejects.toThrow(ForbiddenException);
+  });
 });
